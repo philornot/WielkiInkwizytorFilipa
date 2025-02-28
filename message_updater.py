@@ -1,15 +1,28 @@
-# message_updater.py
+# Zmodyfikuj import w message_updater.py aby uwzględnić strefę czasową
+import datetime
 import logging
 import traceback
-import datetime
 
 import discord
+import pytz
 
 from bot_config import get_channel_id, get_last_message_id, set_last_message_id
-from jira_client import fetch_jira_bugs
 from discord_embeds import create_bugs_embeds
+from jira_client import fetch_jira_bugs
 
 logger = logging.getLogger('jira-discord-bot')
+
+
+def get_warsaw_timestamp():
+    """
+    Zwraca aktualny timestamp w strefie czasowej Warszawy.
+
+    Returns:
+        str: Sformatowana data i czas w strefie czasowej Warszawy
+    """
+    timezone = pytz.timezone('Europe/Warsaw')
+    now = datetime.datetime.now(timezone)
+    return now.strftime('%d.%m.%Y %H:%M:%S')
 
 
 async def update_bugs_message(client):
@@ -20,7 +33,7 @@ async def update_bugs_message(client):
         client (discord.Client): Klient Discord
 
     Returns:
-        bool: True jeśli aktualizacja się powiodła, False w przeciwnym razie
+        bool: True, jeśli aktualizacja się powiodła, False w przeciwnym razie
     """
     try:
         channel_id = get_channel_id('bugs')
@@ -68,7 +81,8 @@ async def update_bugs_message(client):
                 else:
                     # Jeśli jest tylko jeden embed, po prostu aktualizujemy wiadomość
                     await message.edit(embed=embeds[0])
-                    logger.info(f"Zaktualizowano istniejącą wiadomość z bugami (ID: {last_message_id})")
+                    logger.info(
+                        f"Zaktualizowano istniejącą wiadomość z bugami (ID: {last_message_id}) o {get_warsaw_timestamp()}")
 
             except discord.NotFound:
                 logger.warning(f"Wiadomość o ID {last_message_id} nie została znaleziona, wysyłanie nowej")
@@ -85,7 +99,7 @@ async def update_bugs_message(client):
             except Exception as e:
                 logger.error(f"Nieoczekiwany błąd podczas aktualizacji wiadomości: {e}")
                 logger.error(traceback.format_exc())
-                # W przypadku błędu aktualizacji, próbujemy wysłać nową wiadomość
+                # W przypadku błędu aktualizacji próbujemy wysłać nową wiadomość
                 try:
                     logger.info("Próba wysłania nowej wiadomości po błędzie aktualizacji")
                     new_message_id = None

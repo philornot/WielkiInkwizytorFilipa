@@ -6,6 +6,7 @@ import os
 from typing import List, Dict
 
 import discord
+import pytz
 from jira.resources import Issue
 
 logger = logging.getLogger('jira-discord-bot')
@@ -66,9 +67,14 @@ def create_bugs_embeds(issues: List[Issue]) -> List[discord.Embed]:
         embeds = []
 
         if not issues:
+            # Uzyskaj aktualny czas w strefie czasowej Warszawy
+            timezone = pytz.timezone('Europe/Warsaw')
+            now = datetime.datetime.now(timezone)
+            timestamp = now.strftime('%d.%m.%Y %H:%M:%S')
+
             embed = discord.Embed(
                 title="Aktualna lista bugów",
-                description=f"Ostatnia aktualizacja: {datetime.datetime.now().strftime('%d.%m.%Y %H:%M:%S')}",
+                description=f"Ostatnia aktualizacja: {timestamp}",
                 color=discord.Color.red()
             )
             embed.add_field(name="Brak bugów", value="Nie znaleziono żadnych bugów spełniających kryteria.",
@@ -76,8 +82,10 @@ def create_bugs_embeds(issues: List[Issue]) -> List[discord.Embed]:
             embeds.append(embed)
             return embeds
 
-        # Aktualny timestamp dla wszystkich embedów
-        timestamp = datetime.datetime.now().strftime('%d.%m.%Y %H:%M:%S')
+        # Aktualny timestamp dla wszystkich embedów w strefie czasowej Warszawy
+        timezone = pytz.timezone('Europe/Warsaw')
+        now = datetime.datetime.now(timezone)
+        timestamp = now.strftime('%d.%m.%Y %H:%M:%S')
 
         # Grupowanie bugów według statusu
         status_groups = {}
