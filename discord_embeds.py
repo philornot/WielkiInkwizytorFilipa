@@ -305,12 +305,6 @@ def create_help_embed() -> discord.Embed:
         )
 
         embed.add_field(
-            name="/setreportschannelid [id_kanału]",
-            value="Ustawia kanał raportów poprzez ID (tylko dla administratorów)",
-            inline=False
-        )
-
-        embed.add_field(
             name="/setinterval [minuty]",
             value="Ustawia interwał aktualizacji bugów w minutach (tylko dla administratorów)",
             inline=False
