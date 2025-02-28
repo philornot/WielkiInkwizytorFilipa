@@ -1,0 +1,4 @@
+discord.py
+jira
+python-dotenv
+pytz
