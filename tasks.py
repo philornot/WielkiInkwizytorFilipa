@@ -11,7 +11,7 @@ from bot_config import get_update_interval
 from message_updater import update_bugs_message
 from reports import send_daily_report
 
-logger = logging.getLogger('jira-discord-bot')
+logger = logging.getLogger('WielkiInkwizytorFilipa')
 
 
 async def bugs_update_loop(client):
@@ -75,7 +75,7 @@ async def bugs_update_loop(client):
 
 async def schedule_daily_report(client):
     """
-    Planuje wysyłanie dziennych raportów.
+    Planuje wysyłanie dziennych raportów z poprawną obsługą strefy czasowej.
 
     Args:
         client (discord.Client): Klient Discord
@@ -85,41 +85,58 @@ async def schedule_daily_report(client):
         await client.wait_until_ready()
         logger.info("Rozpoczęto planowanie dziennych raportów")
 
-        # Pobierz strefę czasową z konfiguracji
-        timezone_str = os.getenv('TIMEZONE', 'Europe/Warsaw')
+        # Pobierz strefę czasową z konfiguracji - zawsze używamy Warsaw
+        timezone_str = 'Europe/Warsaw'
         timezone = pytz.timezone(timezone_str)
-        logger.info(f"Używanie strefy czasowej: {timezone_str}")
+        logger.info(f"Używanie strefy czasowej: {timezone_str} dla raportów")
 
         # Godzina i minuta raportu - domyślnie 21:37
         report_hour = int(os.getenv('REPORT_HOUR', '21'))
         report_minute = int(os.getenv('REPORT_MINUTE', '37'))
-        logger.info(f"Raporty zaplanowane na godzinę {report_hour}:{report_minute:02d}")
+        logger.info(f"Raporty zaplanowane na godzinę {report_hour}:{report_minute:02d} czasu warszawskiego")
 
         failures_count = 0
 
         while not client.is_closed():
             try:
-                # Pobierz aktualny czas w skonfigurowanej strefie czasowej
-                now = datetime.datetime.now(timezone)
+                # Pobierz aktualny czas w strefie czasowej Warszawy
+                warsaw_now = datetime.datetime.now(timezone)
+                logger.info(f"Aktualny czas warszawski: {warsaw_now.strftime('%Y-%m-%d %H:%M:%S %Z')}")
 
                 # Oblicz czas następnego raportu
-                next_report = now.replace(hour=report_hour, minute=report_minute, second=0, microsecond=0)
+                next_report = warsaw_now.replace(hour=report_hour, minute=report_minute, second=0, microsecond=0)
 
                 # Jeśli czas już minął dzisiaj, zaplanuj na jutro
-                if next_report <= now:
+                if next_report <= warsaw_now:
                     next_report += datetime.timedelta(days=1)
 
                 # Oblicz czas oczekiwania
-                wait_time = (next_report - now).total_seconds()
-                logger.info(f"Następny raport zaplanowano na {next_report}, oczekiwanie {wait_time} sekund")
+                wait_time = (next_report - warsaw_now).total_seconds()
+                next_report_str = next_report.strftime('%Y-%m-%d %H:%M:%S %Z')
+                logger.info(f"Następny raport zaplanowano na {next_report_str}, oczekiwanie {wait_time} sekund")
 
                 # Czekaj do czasu następnego raportu
                 await asyncio.sleep(wait_time)
 
+                # Dla pewności sprawdź jeszcze raz aktualny czas przed wysłaniem
+                current_time = datetime.datetime.now(timezone)
+                logger.info(f"Czas przed wysłaniem raportu: {current_time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+
                 # Wyślij raport
-                await send_daily_report(client)
-                # Po udanym wysłaniu raportu resetuj licznik błędów
-                failures_count = 0
+                logger.info("Rozpoczęto wysyłanie codziennego raportu...")
+                success = await send_daily_report(client)
+
+                if success:
+                    logger.info("Codzienny raport wysłany pomyślnie")
+                    # Po udanym wysłaniu raportu resetuj licznik błędów
+                    failures_count = 0
+                else:
+                    logger.error("Nie udało się wysłać codziennego raportu")
+                    failures_count += 1
+
+                # Nawet jeśli wystąpił błąd, poczekaj co najmniej 1 minutę przed próbą ponownego uruchomienia pętli
+                # To zapobiega zapętleniu w przypadku stałego błędu
+                await asyncio.sleep(60)
 
             except asyncio.CancelledError:
                 logger.info("Planowanie raportów zostało anulowane")
@@ -134,4 +151,96 @@ async def schedule_daily_report(client):
                 await asyncio.sleep(retry_time)
     except Exception as e:
         logger.critical(f"Krytyczny błąd w planowaniu raportów: {e}")
+        logger.critical(traceback.format_exc())
+
+
+async def schedule_weekly_leaderboard(client):
+    """
+    Planuje wysyłanie tygodniowej tablicy wyników.
+
+    Args:
+        client (discord.Client): Klient Discord
+    """
+    try:
+        # Czekaj, aż klient Discord będzie gotowy
+        await client.wait_until_ready()
+        logger.info("Rozpoczęto planowanie tygodniowej tablicy wyników")
+
+        # Pobierz strefę czasową - zawsze Warsaw
+        timezone_str = 'Europe/Warsaw'
+        timezone = pytz.timezone(timezone_str)
+        logger.info(f"Używanie strefy czasowej: {timezone_str} dla tablicy wyników")
+
+        # Dzień tygodnia (0 = poniedziałek, 6 = niedziela) i godzina
+        leaderboard_day = int(os.getenv('LEADERBOARD_WEEKLY_DAY', '0'))  # Domyślnie poniedziałek
+        leaderboard_hour = int(os.getenv('LEADERBOARD_HOUR', '9'))  # Domyślnie 9:00
+        leaderboard_minute = int(os.getenv('LEADERBOARD_MINUTE', '0'))
+
+        logger.info(
+            f"Tablica wyników zaplanowana na dzień {leaderboard_day} (0=pon, 6=niedz) o godzinie {leaderboard_hour}:{leaderboard_minute:02d} czasu warszawskiego")
+
+        failures_count = 0
+
+        while not client.is_closed():
+            try:
+                # Pobierz aktualny czas w strefie czasowej Warszawy
+                warsaw_now = datetime.datetime.now(timezone)
+                logger.info(f"Aktualny czas warszawski: {warsaw_now.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+
+                # Znajdź następny dzień tygodnia, w którym ma być wysłana tablica
+                days_ahead = leaderboard_day - warsaw_now.weekday()
+                if days_ahead < 0:  # To już był ten dzień w tym tygodniu
+                    days_ahead += 7
+                elif days_ahead == 0 and (warsaw_now.hour > leaderboard_hour or
+                                          (
+                                                  warsaw_now.hour == leaderboard_hour and warsaw_now.minute >= leaderboard_minute)):
+                    # To dziś, ale już po czasie wysłania
+                    days_ahead = 7
+
+                # Oblicz czas następnej tablicy
+                next_leaderboard = warsaw_now.replace(hour=leaderboard_hour, minute=leaderboard_minute,
+                                                      second=0, microsecond=0) + datetime.timedelta(days=days_ahead)
+
+                # Oblicz czas oczekiwania
+                wait_time = (next_leaderboard - warsaw_now).total_seconds()
+                next_leaderboard_str = next_leaderboard.strftime('%Y-%m-%d %H:%M:%S %Z')
+                logger.info(
+                    f"Następna tablica wyników zaplanowana na {next_leaderboard_str}, oczekiwanie {wait_time} sekund")
+
+                # Czekaj do czasu następnej tablicy
+                await asyncio.sleep(wait_time)
+
+                # Dla pewności sprawdź jeszcze raz aktualny czas przed wysłaniem
+                current_time = datetime.datetime.now(timezone)
+                logger.info(f"Czas przed wysłaniem tablicy: {current_time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+
+                # Wyślij tablicę wyników
+                from leaderboard import send_leaderboard_to_channel
+                logger.info("Rozpoczęto wysyłanie tygodniowej tablicy wyników...")
+                success = await send_leaderboard_to_channel(client)
+
+                if success:
+                    logger.info("Tygodniowa tablica wyników wysłana pomyślnie")
+                    # Po udanym wysłaniu resetuj licznik błędów
+                    failures_count = 0
+                else:
+                    logger.error("Nie udało się wysłać tygodniowej tablicy wyników")
+                    failures_count += 1
+
+                # Nawet jeśli wystąpił błąd, poczekaj co najmniej 1 minutę przed próbą ponownego uruchomienia pętli
+                await asyncio.sleep(60)
+
+            except asyncio.CancelledError:
+                logger.info("Planowanie tablicy wyników zostało anulowane")
+                break
+            except Exception as e:
+                failures_count += 1
+                logger.error(f"Błąd w planowaniu tablicy wyników: {e}")
+                logger.error(traceback.format_exc())
+                # Poczekaj przed ponowną próbą w przypadku błędu
+                retry_time = min(60 * failures_count, 900)  # max 15 minut
+                logger.info(f"Ponowna próba planowania za {retry_time} sekund")
+                await asyncio.sleep(retry_time)
+    except Exception as e:
+        logger.critical(f"Krytyczny błąd w planowaniu tablicy wyników: {e}")
         logger.critical(traceback.format_exc())

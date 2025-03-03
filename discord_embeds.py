@@ -9,7 +9,7 @@ import discord
 import pytz
 from jira.resources import Issue
 
-logger = logging.getLogger('jira-discord-bot')
+logger = logging.getLogger('WielkiInkwizytorFilipa')
 
 
 def _get_name_mapping() -> Dict[str, str]:
@@ -37,6 +37,7 @@ def _get_name_mapping() -> Dict[str, str]:
         logger.error(f"Błąd podczas wczytywania mapowania imion: {e}")
         logger.error(traceback.format_exc())
         return {}
+
 
 
 def _get_display_name(full_name: str) -> str:
@@ -152,7 +153,7 @@ def create_bugs_embeds(issues: List[Issue]) -> List[discord.Embed]:
                 # Discord ma limit 25 pól na embed
                 if len(current_embed.fields) >= 24 or len(current_embed) + len(field_name) + len(chunk) > 5900:
                     # Jeśli tak, dodaj stopkę do bieżącego embeda
-                    current_embed.set_footer(text="Aby odświeżyć ręcznie użyj /refresh | Bot Jira-Discord")
+                    current_embed.set_footer(text="Aby odświeżyć ręcznie użyj /refresh | Wielki Inkwizytor Filipa")
                     # Dodaj bieżący embed do listy
                     embeds.append(current_embed)
                     # Utwórz nowy embed
@@ -166,7 +167,7 @@ def create_bugs_embeds(issues: List[Issue]) -> List[discord.Embed]:
                 current_embed.add_field(name=field_name, value=chunk, inline=False)
 
         # Dodaj stopkę do ostatniego embeda
-        current_embed.set_footer(text="Aby odświeżyć ręcznie użyj /refresh | Bot Jira-Discord")
+        current_embed.set_footer(text="Aby odświeżyć ręcznie użyj /refresh | Wielki Inkwizytor Filipa")
         # Dodaj ostatni embed do listy
         embeds.append(current_embed)
 

@@ -10,7 +10,7 @@ from bot_config import get_channel_id, get_last_message_id, set_last_message_id
 from discord_embeds import create_bugs_embeds
 from jira_client import fetch_jira_bugs
 
-logger = logging.getLogger('jira-discord-bot')
+logger = logging.getLogger('WielkiInkwizytorFilipa')
 
 
 def get_warsaw_timestamp():

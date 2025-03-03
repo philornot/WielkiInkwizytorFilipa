@@ -7,7 +7,7 @@ from typing import List
 from jira import JIRA
 from jira.resources import Issue
 
-logger = logging.getLogger('jira-discord-bot')
+logger = logging.getLogger('WielkiInkwizytorFilipa')
 
 
 def get_jira_client() -> JIRA:

@@ -6,7 +6,7 @@ import traceback
 import discord
 from discord import app_commands
 
-logger = logging.getLogger('jira-discord-bot')
+logger = logging.getLogger('WielkiInkwizytorFilipa')
 
 # Zmienne globalne
 last_message_id = None

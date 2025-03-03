@@ -1,6 +1,5 @@
 # commands.py
 import logging
-import os
 import traceback
 
 import discord
@@ -11,7 +10,7 @@ from discord_embeds import create_help_embed, create_error_embed
 from message_updater import update_bugs_message
 from reports import generate_on_demand_report
 
-logger = logging.getLogger('jira-discord-bot')
+logger = logging.getLogger('WielkiInkwizytorFilipa')
 
 
 def register_commands(tree):
@@ -344,3 +343,55 @@ def register_commands(tree):
     except Exception as e:
         logger.error(f"Błąd podczas rejestrowania komend slash: {e}")
         logger.error(traceback.format_exc())
+
+    @tree.command(name="leaderboard", description="Wyświetla tablicę wyników zespołu")
+    @app_commands.describe(days="Liczba dni wstecz do analizy (domyślnie 30)")
+    async def show_leaderboard(interaction: discord.Interaction, days: int = 30):
+        try:
+            logger.info(
+                f"Komenda /leaderboard wywołana przez {interaction.user.name} (ID: {interaction.user.id}) z parametrem {days} dni")
+
+            try:
+                await interaction.response.send_message("⏳ Generowanie tablicy wyników...", ephemeral=False)
+            except discord.errors.NotFound:
+                logger.warning("Interakcja wygasła, nie można odpowiedzieć na /leaderboard")
+                return
+
+            # Import funkcji generującej tablicę wyników
+            from leaderboard import generate_leaderboard
+
+            # Generowanie tablicy wyników
+            try:
+                leaderboard_embed = await generate_leaderboard(days=days)
+                await interaction.edit_original_response(content=None, embed=leaderboard_embed)
+                logger.info("Tablica wyników wygenerowana i wysłana pomyślnie")
+            except discord.errors.NotFound:
+                logger.warning("Nie można zaktualizować odpowiedzi - webhook nie istnieje")
+            except Exception as leaderboard_error:
+                logger.error(f"Błąd podczas generowania tablicy wyników: {leaderboard_error}")
+                logger.error(traceback.format_exc())
+                error_embed = create_error_embed(
+                    "Błąd tablicy wyników",
+                    f"Wystąpił błąd podczas generowania tablicy wyników: {str(leaderboard_error)}"
+                )
+                try:
+                    await interaction.edit_original_response(content=None, embed=error_embed)
+                except discord.errors.NotFound:
+                    logger.warning("Nie można zaktualizować odpowiedzi po błędzie - webhook nie istnieje")
+
+        except Exception as e:
+            logger.error(f"Błąd podczas obsługi komendy leaderboard: {e}")
+            logger.error(traceback.format_exc())
+            try:
+                if interaction.response.is_done():
+                    error_embed = create_error_embed(
+                        "Błąd tablicy wyników",
+                        f"Wystąpił błąd podczas generowania tablicy wyników: {str(e)}"
+                    )
+                    await interaction.edit_original_response(content=None, embed=error_embed)
+                else:
+                    await interaction.response.send_message(f"❌ Wystąpił błąd: {str(e)}", ephemeral=True)
+            except discord.errors.NotFound:
+                logger.warning("Nie można odpowiedzieć po błędzie - interakcja wygasła")
+            except Exception:
+                pass

@@ -18,11 +18,11 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler("jira_discord_bot.log"),
+        logging.FileHandler("WielkiInkwizytorFilipa.log"),
         logging.StreamHandler()
     ]
 )
-logger = logging.getLogger('jira-discord-bot')
+logger = logging.getLogger('WielkiInkwizytorFilipa')
 
 
 def load_environment_variables():
@@ -190,6 +190,12 @@ async def main():
 
                 # Uruchomienie planowania raportów dziennych
                 client.loop.create_task(schedule_daily_report(client))
+
+                # Uruchomienie planowania tygodniowej tablicy wyników
+                from tasks import schedule_weekly_leaderboard
+                client.loop.create_task(schedule_weekly_leaderboard(client))
+                logger.info("Uruchomiono planowanie tygodniowej tablicy wyników")
+
             except Exception as e:
                 logger.error(f"Błąd podczas inicjalizacji bota: {e}")
                 logger.error(traceback.format_exc())

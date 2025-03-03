@@ -4,13 +4,14 @@ import logging
 import os
 import traceback
 
+import discord
 import pytz
 
 from bot_config import get_channel_id
 from jira_client import get_completed_tasks_for_report
 from discord_embeds import create_completed_tasks_report, create_error_embed
 
-logger = logging.getLogger('jira-discord-bot')
+logger = logging.getLogger('WielkiInkwizytorFilipa')
 
 
 async def generate_on_demand_report():
@@ -21,8 +22,8 @@ async def generate_on_demand_report():
         discord.Embed: Embed z raportem
     """
     try:
-        # Ustawienie strefy czasowej
-        timezone_str = os.getenv('TIMEZONE', 'Europe/Warsaw')
+        # Ustawienie strefy czasowej na Warsaw (hardcoded)
+        timezone_str = 'Europe/Warsaw'
         timezone = pytz.timezone(timezone_str)
         now = datetime.datetime.now(timezone)
         logger.info(f"Generowanie raportu na żądanie o {now.strftime('%Y-%m-%d %H:%M:%S %Z')}")
@@ -46,6 +47,7 @@ async def generate_on_demand_report():
         end_date_time = f"{end_date} 21:36"
 
         logger.info(f"Pobieranie zadań ukończonych w okresie: {start_date_time} - {end_date_time}")
+        logger.info(f"Używając strefy czasowej: {timezone_str}")
 
         # Pobieranie zadań z Jiry
         tasks = await get_completed_tasks_for_report(start_date_time, end_date_time)
@@ -87,13 +89,44 @@ async def send_daily_report(client):
             logger.error(f"Nie można znaleźć kanału raportów o ID {channel_id}")
             return False
 
+        # Ustaw strefę czasową na Warsaw
+        timezone = pytz.timezone('Europe/Warsaw')
+        now = datetime.datetime.now(timezone)
+        logger.info(
+            f"Generowanie dziennego raportu dla kanału {channel.name} (ID: {channel_id}) o {now.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+
         # Generuj raport
-        logger.info(f"Generowanie dziennego raportu dla kanału {channel.name} (ID: {channel_id})")
         report_embed = await generate_on_demand_report()
+
+        # Dodaj informację o automatycznym wygenerowaniu
+        if isinstance(report_embed, discord.Embed):
+            if report_embed.footer:
+                current_footer = report_embed.footer.text
+                new_footer = f"{current_footer} | Wygenerowano automatycznie"
+                report_embed.set_footer(text=new_footer)
+            else:
+                report_embed.set_footer(text="Wygenerowano automatycznie")
 
         # Wysłij raport
         await channel.send(embed=report_embed)
         logger.info(f"Wysłano dzienny raport na kanał {channel.name}")
+
+        # Sprawdź czy mamy również tablicę wyników do wysłania
+        try:
+            from leaderboard import send_leaderboard_to_channel
+            weekly_day = int(os.getenv('LEADERBOARD_WEEKLY_DAY', '1'))  # Domyślnie poniedziałek (0=pon, 6=niedz)
+
+            # Jeśli dzisiaj jest dzień tygodnia ustawiony dla tablicy wyników, wyślij ją
+            if now.weekday() == weekly_day:
+                logger.info("Dzisiaj jest dzień wysyłania tygodniowej tablicy wyników")
+                await send_leaderboard_to_channel(client, channel_id)
+
+        except ImportError:
+            logger.warning("Moduł leaderboard nie jest dostępny, pomijanie wysyłania tablicy wyników")
+        except Exception as leaderboard_error:
+            logger.error(f"Błąd podczas wysyłania tablicy wyników: {leaderboard_error}")
+            logger.error(traceback.format_exc())
+
         return True
     except Exception as e:
         logger.error(f"Błąd podczas wysyłania dziennego raportu: {e}")
