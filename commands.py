@@ -202,7 +202,7 @@ def register_commands(tree):
                         logger.warning("Interakcja wygasła, nie można odpowiedzieć na /setinterval")
                     return
 
-                # Sprawdź czy wartość jest prawidłowa
+                # Sprawdź, czy wartość jest prawidłowa
                 if minutes < 1:
                     try:
                         await interaction.response.send_message("❌ Interwał musi być większy niż 1 minuta!",
@@ -253,10 +253,36 @@ def register_commands(tree):
                     pass
 
         @tree.command(name="generate_report", description="Wygeneruj raport ukończonych zadań na żądanie")
-        async def generate_report(interaction: discord.Interaction):
+        @app_commands.describe(
+            period="Wybierz okres raportu",
+            custom_start="Własna data początkowa (format: YYYY-MM-DD, tylko dla 'Własny zakres')",
+            custom_end="Własna data końcowa (format: YYYY-MM-DD, tylko dla 'Własny zakres')"
+        )
+        @app_commands.choices(period=[
+            app_commands.Choice(name="Dzień (domyślny)", value="day"),
+            app_commands.Choice(name="Tydzień", value="week"),
+            app_commands.Choice(name="Miesiąc", value="month"),
+            app_commands.Choice(name="Własny zakres", value="custom")
+        ])
+        async def generate_report(
+                interaction: discord.Interaction,
+                period: str = "day",
+                custom_start: str = None,
+                custom_end: str = None
+        ):
             try:
                 logger.info(
-                    f"Komenda /generate_report wywołana przez {interaction.user.name} (ID: {interaction.user.id})")
+                    f"Komenda /generate_report wywołana przez {interaction.user.name} (ID: {interaction.user.id}) "
+                    f"z parametrami: period={period}, custom_start={custom_start}, custom_end={custom_end}"
+                )
+
+                # Walidacja parametrów
+                if period == "custom" and (not custom_start or not custom_end):
+                    await interaction.response.send_message(
+                        "❌ Dla własnego zakresu dat wymagane jest podanie dat początkowej i końcowej w formacie YYYY-MM-DD",
+                        ephemeral=True
+                    )
+                    return
 
                 try:
                     await interaction.response.send_message("⏳ Generowanie raportu...", ephemeral=False)
@@ -266,7 +292,7 @@ def register_commands(tree):
 
                 # Generowanie raportu
                 try:
-                    report_embed = await generate_on_demand_report()
+                    report_embed = await generate_on_demand_report(period, custom_start, custom_end)
                     await interaction.edit_original_response(content=None, embed=report_embed)
                     logger.info("Raport wygenerowany i wysłany pomyślnie")
                 except discord.errors.NotFound:
