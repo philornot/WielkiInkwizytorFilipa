@@ -1,4 +1,4 @@
-# Zmodyfikuj import w message_updater.py aby uwzględnić strefę czasową
+# message_updater.py
 import datetime
 import logging
 import traceback
@@ -23,6 +23,45 @@ def get_warsaw_timestamp():
     timezone = pytz.timezone('Europe/Warsaw')
     now = datetime.datetime.now(timezone)
     return now.strftime('%d.%m.%Y %H:%M:%S')
+
+
+async def clear_previous_bug_messages(client, channel):
+    """
+    Czyści poprzednie wiadomości z bugami wysłane przez bota na danym kanale.
+
+    Args:
+        client (discord.Client): Klient Discord
+        channel (discord.TextChannel): Kanał Discord do wyczyszczenia
+
+    Returns:
+        int: Liczba usuniętych wiadomości
+    """
+    try:
+        logger.info(f"Czyszczenie poprzednich wiadomości z bugami na kanale {channel.name}")
+
+        # W nowszych wersjach Discord.py (2.0+) history() zwraca asynchroniczny iterator
+        bot_id = client.user.id
+        deleted_count = 0
+
+        # Iteracja przez asynchroniczny iterator historii (limit 30 wiadomości)
+        async for message in channel.history(limit=30):
+            # Sprawdź, czy wiadomość jest od tego bota
+            if message.author.id == bot_id:
+                # Sprawdź, czy wiadomość zawiera embedy, które wyglądają jak listy bugów
+                for embed in message.embeds:
+                    if embed.title and ("Aktualna lista bugów" in embed.title):
+                        logger.info(f"Usuwanie starej wiadomości z bugami (ID: {message.id})")
+                        await message.delete()
+                        deleted_count += 1
+                        break  # Przerwij po usunięciu, aby uniknąć sprawdzania innych embedów
+
+        logger.info(f"Usunięto {deleted_count} starych wiadomości z bugami")
+        return deleted_count
+
+    except Exception as e:
+        logger.error(f"Błąd podczas czyszczenia starych wiadomości: {e}")
+        logger.error(traceback.format_exc())
+        return 0
 
 
 async def update_bugs_message(client):
@@ -86,7 +125,11 @@ async def update_bugs_message(client):
 
             except discord.NotFound:
                 logger.warning(f"Wiadomość o ID {last_message_id} nie została znaleziona, wysyłanie nowej")
-                # Jeśli wiadomość została usunięta, wyślij nową
+
+                # Wyczyść poprzednie wiadomości z bugami przed wysłaniem nowych
+                await clear_previous_bug_messages(client, channel)
+
+                # Wysyłanie nowych wiadomości
                 new_message_id = None
                 for i, embed in enumerate(embeds):
                     new_message = await channel.send(embed=embed)
@@ -102,6 +145,10 @@ async def update_bugs_message(client):
                 # W przypadku błędu aktualizacji próbujemy wysłać nową wiadomość
                 try:
                     logger.info("Próba wysłania nowej wiadomości po błędzie aktualizacji")
+
+                    # Wyczyść poprzednie wiadomości z bugami przed wysłaniem nowych
+                    await clear_previous_bug_messages(client, channel)
+
                     new_message_id = None
                     for i, embed in enumerate(embeds):
                         new_message = await channel.send(embed=embed)
@@ -116,8 +163,13 @@ async def update_bugs_message(client):
                     logger.error(traceback.format_exc())
                     return False
         else:
-            # Wysłanie nowej wiadomości, jeśli to pierwszy raz
-            logger.info("Brak poprzedniej wiadomości, wysyłanie nowej")
+            # Brak poprzedniej wiadomości (np. po restarcie bota)
+            logger.info("Brak poprzedniej wiadomości, czyszczenie starych wiadomości z bugami")
+
+            # Wyczyść poprzednie wiadomości z bugami przed wysłaniem nowych
+            await clear_previous_bug_messages(client, channel)
+
+            # Wysyłanie nowych wiadomości
             new_message_id = None
             for i, embed in enumerate(embeds):
                 new_message = await channel.send(embed=embed)
@@ -125,7 +177,7 @@ async def update_bugs_message(client):
                     new_message_id = new_message.id
 
             set_last_message_id(new_message_id)
-            logger.info(f"Wysłano {len(embeds)} pierwszych wiadomości z bugami, ID ostatniej: {new_message_id}")
+            logger.info(f"Wysłano {len(embeds)} nowych wiadomości z bugami, ID ostatniej: {new_message_id}")
 
         return True
     except Exception as e:
