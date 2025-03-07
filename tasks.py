@@ -2,12 +2,14 @@
 import asyncio
 import datetime
 import logging
-import os
 import traceback
 
 import pytz
 
-from bot_config import get_update_interval
+from bot_config import (
+    get_update_interval, is_reports_enabled, is_leaderboard_enabled,
+    get_report_time, get_leaderboard_time
+)
 from message_updater import update_bugs_message
 from reports import send_daily_report
 
@@ -90,15 +92,19 @@ async def schedule_daily_report(client):
         timezone = pytz.timezone(timezone_str)
         logger.info(f"Używanie strefy czasowej: {timezone_str} dla raportów")
 
-        # Godzina i minuta raportu - domyślnie 21:37
-        report_hour = int(os.getenv('REPORT_HOUR', '21'))
-        report_minute = int(os.getenv('REPORT_MINUTE', '37'))
-        logger.info(f"Raporty zaplanowane na godzinę {report_hour}:{report_minute:02d} czasu warszawskiego")
-
         failures_count = 0
 
         while not client.is_closed():
             try:
+                # Sprawdź czy raporty są włączone
+                if not is_reports_enabled():
+                    logger.info("Raporty są wyłączone. Sprawdzam ponownie za 5 minut...")
+                    await asyncio.sleep(300)  # Sprawdź ponownie za 5 minut
+                    continue
+
+                # Godzina i minuta raportu - pobierz aktualne ustawienia
+                report_hour, report_minute = get_report_time()
+
                 # Pobierz aktualny czas w strefie czasowej Warszawy
                 warsaw_now = datetime.datetime.now(timezone)
                 logger.info(f"Aktualny czas warszawski: {warsaw_now.strftime('%Y-%m-%d %H:%M:%S %Z')}")
@@ -117,6 +123,11 @@ async def schedule_daily_report(client):
 
                 # Czekaj do czasu następnego raportu
                 await asyncio.sleep(wait_time)
+
+                # Sprawdź ponownie, czy raporty są nadal włączone
+                if not is_reports_enabled():
+                    logger.info("Raporty zostały wyłączone w trakcie oczekiwania. Pomijam wysyłanie raportu.")
+                    continue
 
                 # Dla pewności sprawdź jeszcze raz aktualny czas przed wysłaniem
                 current_time = datetime.datetime.now(timezone)
@@ -171,18 +182,19 @@ async def schedule_weekly_leaderboard(client):
         timezone = pytz.timezone(timezone_str)
         logger.info(f"Używanie strefy czasowej: {timezone_str} dla tablicy wyników")
 
-        # Dzień tygodnia (0 = poniedziałek, 6 = niedziela) i godzina
-        leaderboard_day = int(os.getenv('LEADERBOARD_WEEKLY_DAY', '0'))  # Domyślnie poniedziałek
-        leaderboard_hour = int(os.getenv('LEADERBOARD_HOUR', '9'))  # Domyślnie 9:00
-        leaderboard_minute = int(os.getenv('LEADERBOARD_MINUTE', '0'))
-
-        logger.info(
-            f"Tablica wyników zaplanowana na dzień {leaderboard_day} (0=pon, 6=niedz) o godzinie {leaderboard_hour}:{leaderboard_minute:02d} czasu warszawskiego")
-
         failures_count = 0
 
         while not client.is_closed():
             try:
+                # Sprawdź czy leaderboard jest włączony
+                if not is_leaderboard_enabled():
+                    logger.info("Tablica wyników jest wyłączona. Sprawdzam ponownie za 5 minut...")
+                    await asyncio.sleep(300)  # Sprawdź ponownie za 5 minut
+                    continue
+
+                # Pobierz konfigurację tablicy wyników
+                leaderboard_day, leaderboard_hour, leaderboard_minute = get_leaderboard_time()
+
                 # Pobierz aktualny czas w strefie czasowej Warszawy
                 warsaw_now = datetime.datetime.now(timezone)
                 logger.info(f"Aktualny czas warszawski: {warsaw_now.strftime('%Y-%m-%d %H:%M:%S %Z')}")
@@ -209,6 +221,11 @@ async def schedule_weekly_leaderboard(client):
 
                 # Czekaj do czasu następnej tablicy
                 await asyncio.sleep(wait_time)
+
+                # Sprawdź ponownie, czy leaderboard jest nadal włączony
+                if not is_leaderboard_enabled():
+                    logger.info("Tablica wyników została wyłączona w trakcie oczekiwania. Pomijam wysyłanie.")
+                    continue
 
                 # Dla pewności sprawdź jeszcze raz aktualny czas przed wysłaniem
                 current_time = datetime.datetime.now(timezone)

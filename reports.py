@@ -8,8 +8,8 @@ import discord
 import pytz
 
 from bot_config import get_channel_id
-from jira_client import get_completed_tasks_for_report
 from discord_embeds import create_completed_tasks_report, create_error_embed
+from jira_client import get_completed_tasks_for_report
 
 logger = logging.getLogger('WielkiInkwizytorFilipa')
 
@@ -52,23 +52,20 @@ async def generate_on_demand_report(period="day", custom_start=None, custom_end=
                     "Podaj daty w formacie YYYY-MM-DD (np. 2023-12-31)"
                 )
         elif period == "day":
-            # Domyślny przedział (od 21:37 wczoraj do 21:36 dziś/jutro)
-            end_time = now.replace(hour=21, minute=36, second=0, microsecond=0)
-            if now.hour < 21 or (now.hour == 21 and now.minute < 37):
-                # Jeśli raport generowany jest przed 21:37, to kończymy o 21:36 dzisiaj
-                end_date = end_time.strftime('%Y-%m-%d')
-            else:
-                # Jeśli raport generowany jest po 21:37, to kończymy o 21:36 jutro
-                end_time = end_time + datetime.timedelta(days=1)
-                end_date = end_time.strftime('%Y-%m-%d')
+            # Koniec to aktualny czas (gdy raport jest generowany)
+            end_time = now
 
-            # Czas początkowy zawsze jest o 21:37 dzień wcześniej
-            start_time = end_time.replace(hour=21, minute=37) - datetime.timedelta(days=1)
-            start_date = start_time.strftime('%Y-%m-%d')
+            # Początek to 21:37 poprzedniego dnia
+            yesterday = now - datetime.timedelta(days=1)
+            start_time = yesterday.replace(hour=21, minute=37, second=0, microsecond=0)
 
             # Formatowanie dat dla zapytania JQL
+            start_date = start_time.strftime('%Y-%m-%d')
+            end_date = end_time.strftime('%Y-%m-%d')
+
             start_date_time = f"{start_date} 21:37"
-            end_date_time = f"{end_date} 21:36"
+            end_date_time = f"{end_date} {end_time.strftime('%H:%M')}"
+
         elif period == "week":
             # Ostatnie 7 dni
             end_time = now.replace(hour=23, minute=59, second=59, microsecond=0)

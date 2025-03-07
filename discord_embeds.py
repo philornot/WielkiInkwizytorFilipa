@@ -295,39 +295,59 @@ def create_help_embed() -> discord.Embed:
             color=discord.Color.blue()
         )
 
+        # Sekcja raportowania błędów
         embed.add_field(
-            name="/refresh",
-            value="Ręcznie odświeża listę bugów z Jiry",
+            name="🐞 Zarządzanie bugami",
+            value=(
+                "**/refresh**\n"
+                "Ręcznie odświeża listę bugów z Jiry\n"
+                "**/setinterval [minuty]**\n"
+                "Ustawia interwał aktualizacji bugów w minutach (tylko dla administratorów)\n"
+            ),
             inline=False
         )
 
+        # Sekcja raportów
         embed.add_field(
-            name="/setbugschannel [kanał]",
-            value="Ustawia kanał do wyświetlania bugów (tylko dla administratorów)",
+            name="📝 Zarządzanie raportami",
+            value=(
+                "**/generate_report**\n"
+                "Generuje raport ukończonych zadań na żądanie\n"
+                "**/wlacz_raporty**\n"
+                "Włącza automatyczne wysyłanie raportów (tylko dla administratorów)\n"
+                "**/wylacz_raporty**\n"
+                "Wyłącza automatyczne wysyłanie raportów (tylko dla administratorów)\n"
+                "**/konfiguracja_raportu [kanał] [godzina] [minuta]**\n"
+                "Konfiguruje kanał i czas wysyłania raportów (tylko dla administratorów)\n"
+            ),
             inline=False
         )
 
+        # Sekcja leaderboard
         embed.add_field(
-            name="/setreportschannel [kanał]",
-            value="Ustawia kanał do wysyłania raportów (tylko dla administratorów)",
+            name="🏆 Zarządzanie tablicą wyników",
+            value=(
+                "**/leaderboard [dni]**\n"
+                "Wyświetla tablicę wyników zespołu (opcjonalnie podaj liczbę dni)\n"
+                "**/wlacz_leaderboard**\n"
+                "Włącza automatyczne wysyłanie tablicy wyników (tylko dla administratorów)\n"
+                "**/wylacz_leaderboard**\n"
+                "Wyłącza automatyczne wysyłanie tablicy wyników (tylko dla administratorów)\n"
+                "**/konfiguracja_leaderboard [kanał] [dzien] [godzina] [minuta]**\n"
+                "Konfiguruje kanał i czas wysyłania tablicy wyników (tylko dla administratorów)\n"
+            ),
             inline=False
         )
 
+        # Sekcja informacji
         embed.add_field(
-            name="/setinterval [minuty]",
-            value="Ustawia interwał aktualizacji bugów w minutach (tylko dla administratorów)",
-            inline=False
-        )
-
-        embed.add_field(
-            name="/generate_report",
-            value="Generuje raport ukończonych zadań na żądanie",
-            inline=False
-        )
-
-        embed.add_field(
-            name="/help",
-            value="Wyświetla tę pomoc",
+            name="ℹ️ Informacje i diagnostyka",
+            value=(
+                "**/stan**\n"
+                "Wyświetla szczegółowe informacje o stanie i konfiguracji bota\n"
+                "**/help**\n"
+                "Wyświetla tę pomoc\n"
+            ),
             inline=False
         )
 
